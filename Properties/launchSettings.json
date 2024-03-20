@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "snapapp_svc": {
+      "commandName": "Project",
+      "commandLineArgs": "--port 7256",
+      "launchBrowser": false
+    }
+  }
+}

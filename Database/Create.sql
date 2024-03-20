@@ -1,0 +1,59 @@
+IF OBJECT_ID('dbo.Logins', 'U') IS NOT NULL
+BEGIN
+    DELETE FROM Logins;
+END
+GO
+
+IF OBJECT_ID('dbo.Users', 'U') IS NOT NULL
+BEGIN
+    DELETE FROM Users;
+END
+GO
+
+DROP TABLE IF EXISTS Logins;
+GO
+
+DROP TABLE IF EXISTS Users;
+GO
+
+CREATE TABLE Users
+(
+    [Id] UNIQUEIDENTIFIER PRIMARY KEY,
+    [Email] NVARCHAR(40) UNIQUE NOT NULL,
+    [Password] VARCHAR(60) NOT NULL,
+    [Company] VARCHAR(60) NOT NULL,
+    [FirstName] NVARCHAR(40) NOT NULL,
+    [LastName] NVARCHAR(40) NOT NULL,
+    [Phone] VARCHAR(20) NOT NULL,
+    [Role] VARCHAR(10) NOT NULL,
+    [IsEmailVerified] BIT DEFAULT 0,
+    [Picture] VARCHAR(60),
+    [Salt] BINARY(16) NOT NULL,
+    [CreatedOn] DATETIME2 DEFAULT GETUTCDATE()
+);
+GO
+
+CREATE TABLE Logins
+(
+    [Id] INT IDENTITY(1,1) PRIMARY KEY,
+    [UserId] UNIQUEIDENTIFIER NOT NULL,
+    [CryptoKeys] BINARY(1172) NOT NULL,
+    [ExpiresOn] DATETIME2 DEFAULT GETUTCDATE(),
+    [CreatedOn] DATETIME2 DEFAULT GETUTCDATE(),
+    FOREIGN KEY(UserId) REFERENCES Users(Id)
+);
+
+DROP PROCEDURE IF EXISTS CheckExistingUser;
+GO
+
+CREATE PROC CheckExistingUser
+(
+    @email NVARCHAR(40)
+)
+AS
+    SELECT
+        CASE
+            WHEN EXISTS (SELECT 1 FROM Users WHERE Email = @email)
+            THEN 1 ELSE 0
+        END AS UserExists;
+GO

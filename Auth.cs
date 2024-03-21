@@ -81,27 +81,9 @@ namespace SnapApp.Svc
         {
             logger.LogInformation("[SignUp] function processed a request.");
 
-            Guid deviceId;
             var scalarObj = JsonSerializer.Deserialize<object>(scalarJson);
             bool userExists = scalarObj is JsonElement jEle && jEle[0].GetProperty("UserExists").GetInt32() != 0;
             HttpResponseData resp = req.CreateResponse();
-
-            if (req.Headers.TryGetValues("X-Device-Id", out IEnumerable<string>? values) && values != null)
-            {
-                string deviceIdStr = Encoding.UTF8.GetString(Convert.FromBase64String(values.First()));
-                deviceId = Guid.Parse(deviceIdStr.DeObfuscate());
-            }
-            else
-            {
-                resp.Headers.Add("Content-Type", "text/plain; charset=utf-8");
-                resp.StatusCode = HttpStatusCode.NotFound;
-                await resp.WriteStringAsync("Missing device id.");
-
-                return new SignUpResult()
-                {
-                    HttpResponse = resp
-                };
-            }
 
             if (userExists)
             {
@@ -131,22 +113,19 @@ namespace SnapApp.Svc
                     Phone = signUp.Phone,
                     Role = signUp.Role,
                     Salt = [],
-                    CryptoKeys = [],
                     CreatedOn = now
                 };
 
                 string tokenJson = JsonSerializer.Serialize(new AccessToken
                 {
                     UserId = userId,
-                    IssuedOn = now,
-                    // ExpiresIn = Settings.TokenExpirationSpanInSecs,
-                    DeviceId = deviceId
+                    Role = signUp.Role,
+                    IssuedOn = now
                 }, JsonSerializationOptions.CamelCaseNamingOptions);
 
                 using RSACryptoServiceProvider rsa = new(2048);
 
                 user.Salt = CryptoHelpers.GenerateSalt();
-                user.CryptoKeys = rsa.ExportCspBlob(true);
                 
                 user.Password = signUp.Password.HashPassword(user.Salt);
                 string token = Convert.ToBase64String(rsa.Encrypt(Encoding.UTF8.GetBytes(tokenJson), false));
@@ -157,8 +136,7 @@ namespace SnapApp.Svc
                 {
                     UserId = userId,
                     UserCreatedOn = now,
-                    AccessToken = token,
-                    EncryptionKey = Convert.ToBase64String(rsa.ExportCspBlob(false)),
+                    AccessToken = token
                 }, JsonSerializationOptions.CamelCaseNamingOptions));
 
                 return new SignUpResult()
@@ -167,7 +145,7 @@ namespace SnapApp.Svc
                     Login = new()
                     {
                         UserId = userId,
-                        DeviceId = deviceId,
+                        CryptoKeys = rsa.ExportCspBlob(true),
                         ExpiresOn = now.AddSeconds(Settings.TokenExpirationSpanInSecs),
                         CreatedOn = now
                     },

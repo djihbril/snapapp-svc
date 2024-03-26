@@ -2,6 +2,7 @@ namespace SnapApp.Svc.Models
 {
     public struct LoginInfo
     {
+        public int Id { get; set; }
         public Guid UserId { get; set; }
         public string UserEmail { get; set; }
         public string UserPassword { get; set; }

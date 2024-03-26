@@ -1,10 +1,7 @@
 using System.Net;
-using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using Microsoft.AspNetCore.Authorization.Infrastructure;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Extensions.Sql;
 using Microsoft.Azure.Functions.Worker.Http;
@@ -20,22 +17,24 @@ namespace SnapApp.Svc
     public class Auth(ILogger<Auth> logger)
     {
         [Function("Login")]
-        public async Task<HttpResponseData> RunLogin([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req, [FromBody] Credentials creds,
+        public async Task<LoginResult> RunLogin([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req, [FromBody] Credentials creds,
             [SqlInput(commandText: "GetLoginInfo", commandType: System.Data.CommandType.StoredProcedure, parameters: "@email={Username}",
             connectionStringSetting: "SqlConnectionString")] IEnumerable<LoginInfo> logins)
         {
             logger.LogInformation("[Login] function processed a request.");
 
-            Guid deviceId;
             HttpResponseData resp = req.CreateResponse();
 
-            async Task<HttpResponseData> DenyAuth()
+            async Task<LoginResult> DenyAuth()
             {
                 resp.Headers.Add("Content-Type", "text/plain; charset=utf-8");
                 resp.StatusCode = HttpStatusCode.Unauthorized;
                 await resp.WriteStringAsync("Invalid username or password.");
 
-                return resp;
+                return new LoginResult
+                {
+                    HttpResponse = resp
+                };
             }
 
             if (logins == null || !logins.Any())
@@ -50,28 +49,64 @@ namespace SnapApp.Svc
                 return await DenyAuth();
             }
 
-            if (req.Headers.TryGetValues("X-Device-Id", out IEnumerable<string>? values) && values != null)
-            {
-                string deviceIdStr = Encoding.UTF8.GetString(Convert.FromBase64String(values.First()));
-                deviceId = Guid.Parse(deviceIdStr.DeObfuscate());
-            }
-            else
-            {
-                resp.Headers.Add("Content-Type", "text/plain; charset=utf-8");
-                resp.StatusCode = HttpStatusCode.NotFound;
-                await resp.WriteStringAsync("Missing device id.");
+            DateTime now = DateTime.UtcNow;
 
-                return resp;
-            }
+            Login newLogin = new()
+            {
+                UserId = login.UserId,
+                CryptoKeys = login.CryptoKeys,
+                ExpiresOn = now.AddSeconds(Settings.TokenExpirationSpanInSecs),
+                CreatedOn = now
+            };
+
+            AccessToken accessToken = new()
+            {
+                UserId = login.UserId,
+                Role = login.UserRole,
+                IssuedOn = now
+            };
 
             if (login.LoginCreatedOn > DateTime.MinValue)
             {
-                // TODO: Update login.
+                newLogin.Id = login.Id;
+                newLogin.CreatedOn = login.LoginCreatedOn;
+                accessToken.IssuedOn = login.LoginCreatedOn;
             }
             else
             {
-                // TODO: Add login.
+                newLogin.CryptoKeys = new RSACryptoServiceProvider(2048).ExportCspBlob(true);
             }
+
+            using RSACryptoServiceProvider rsa = new();
+            rsa.ImportCspBlob(newLogin.CryptoKeys);
+
+            string tokenJson = JsonSerializer.Serialize(accessToken, JsonSerializationOptions.CamelCaseNamingOptions);
+            string token = Convert.ToBase64String(rsa.Encrypt(Encoding.UTF8.GetBytes(tokenJson), false));
+
+            resp.Headers.Add("Content-Type", "application/json; charset=utf-8");
+            resp.StatusCode = HttpStatusCode.OK;
+            await resp.WriteStringAsync(JsonSerializer.Serialize(new
+            {
+                UserInfo = new
+                {
+                    Email = login.UserEmail,
+                    Company = login.UserCompany,
+                    FirstName = login.UserFirstName,
+                    LastName = login.UserLastName,
+                    Phone = login.UserPhone,
+                    Role = login.UserRole,
+                    Picture = login.UserPicture,
+                    IsEmailVerified = login.IsUserEmailVerified,
+                    CreatedOn = login.UserCreatedOn
+                },
+                AccessToken = token
+            }, JsonSerializationOptions.CamelCaseNamingOptions));
+
+            return new LoginResult
+            {
+                Login = newLogin,
+                HttpResponse = resp
+            };
         }
 
         [Function("SignUp")]
@@ -126,7 +161,7 @@ namespace SnapApp.Svc
                 using RSACryptoServiceProvider rsa = new(2048);
 
                 user.Salt = CryptoHelpers.GenerateSalt();
-                
+
                 user.Password = signUp.Password.HashPassword(user.Salt);
                 string token = Convert.ToBase64String(rsa.Encrypt(Encoding.UTF8.GetBytes(tokenJson), false));
 
@@ -134,7 +169,6 @@ namespace SnapApp.Svc
                 resp.StatusCode = HttpStatusCode.OK;
                 await resp.WriteStringAsync(JsonSerializer.Serialize(new
                 {
-                    UserId = userId,
                     UserCreatedOn = now,
                     AccessToken = token
                 }, JsonSerializationOptions.CamelCaseNamingOptions));

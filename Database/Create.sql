@@ -57,3 +57,19 @@ AS
             THEN 1 ELSE 0
         END AS UserExists;
 GO
+
+DROP PROCEDURE IF EXISTS GetLoginInfo;
+GO
+
+CREATE PROC GetLoginInfo
+(
+	@email NVARCHAR(40)
+)
+AS
+
+	SELECT
+		l.Id, u.Id AS UserId, u.Email AS UserEmail, u.[Password] AS UserPassword, u.Company AS UserCompany, u.FirstName AS UserFirstName, u.LastName AS UserLastName,
+		u.Phone AS UserPhone, u.[Role] AS UserRole, u.IsEmailVerified AS IsUserEmailVerified, u.Picture AS UserPicture, u.CreatedOn AS UserCreatedOn, u.Salt, l.CryptoKeys,
+		l.ExpiresOn AS LoginExpiresOn, l.CreatedOn AS LoginCreatedOn
+	FROM Users u join Logins l ON u.Id = l.UserId WHERE Email = @email
+GO

@@ -2,51 +2,50 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 
-namespace SnapApp.Svc.Extensions
+namespace SnapApp.Svc.Extensions;
+
+public static partial class StringExtensions
 {
-    public static partial class StringExtensions
+    [GeneratedRegex(@"([A-Z])", RegexOptions.Compiled)]
+    private static partial Regex CapsRegex();
+
+    private static string Caesar(this string input, short shift)
     {
-        [GeneratedRegex(@"([A-Z])", RegexOptions.Compiled)]
-        private static partial Regex CapsRegex();
+        int maxChar = Convert.ToInt32(char.MaxValue);
+        int minChar = Convert.ToInt32(char.MinValue);
+        char[] buffer = input.ToCharArray();
 
-        private static string Caesar(this string input, short shift)
+        for (int i = 0; i < buffer.Length; i++)
         {
-            int maxChar = Convert.ToInt32(char.MaxValue);
-            int minChar = Convert.ToInt32(char.MinValue);
-            char[] buffer = input.ToCharArray();
+            int shifted = Convert.ToInt32(buffer[i]) + shift;
 
-            for (int i = 0; i < buffer.Length; i++)
+            if (shifted > maxChar)
             {
-                int shifted = Convert.ToInt32(buffer[i]) + shift;
-
-                if (shifted > maxChar)
-                {
-                    shifted -= maxChar;
-                }
-                else if (shifted < minChar)
-                {
-                    shifted += maxChar;
-                }
-
-                buffer[i] = Convert.ToChar(shifted);
+                shifted -= maxChar;
+            }
+            else if (shifted < minChar)
+            {
+                shifted += maxChar;
             }
 
-            return new string(buffer);
+            buffer[i] = Convert.ToChar(shifted);
         }
 
-        public static string TitleToSnakeCase(this string input) => CapsRegex().Replace(input, " $1").Trim().ToLower().Replace(' ', '_');
-
-        public static string SnakeToTitleCase(this string input) => CultureInfo.CurrentCulture.TextInfo.ToTitleCase(input.Replace('_', ' '));
-
-        public static string HashPassword(this string input, byte[] salt)
-        {
-            using var pbkdf2 = new Rfc2898DeriveBytes(input, salt, 100000, HashAlgorithmName.SHA256);
-            byte[] hashBytes = pbkdf2.GetBytes(256 / 8); // 256 bits (32 bytes)
-            return Convert.ToBase64String(hashBytes);
-        }
-
-        public static string Obfuscate(this string input) => input.Caesar(59);
-
-        public static string DeObfuscate(this string input) => input.Caesar(-59);
+        return new string(buffer);
     }
+
+    public static string TitleToSnakeCase(this string input) => CapsRegex().Replace(input, " $1").Trim().ToLower().Replace(' ', '_');
+
+    public static string SnakeToTitleCase(this string input) => CultureInfo.CurrentCulture.TextInfo.ToTitleCase(input.Replace('_', ' '));
+
+    public static string HashPassword(this string input, byte[] salt)
+    {
+        using var pbkdf2 = new Rfc2898DeriveBytes(input, salt, 100000, HashAlgorithmName.SHA256);
+        byte[] hashBytes = pbkdf2.GetBytes(256 / 8); // 256 bits (32 bytes)
+        return Convert.ToBase64String(hashBytes);
+    }
+
+    public static string Obfuscate(this string input) => input.Caesar(59);
+
+    public static string DeObfuscate(this string input) => input.Caesar(-59);
 }

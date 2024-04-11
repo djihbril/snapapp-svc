@@ -2,7 +2,7 @@ namespace SnapApp.Svc.Models;
 
 public struct LoginInfo
 {
-    public int Id { get; set; }
+    public int? Id { get; set; }
     public Guid UserId { get; set; }
     public string UserEmail { get; set; }
     public string UserPassword { get; set; }
@@ -16,6 +16,6 @@ public struct LoginInfo
     public DateTime UserCreatedOn { get; set; }
     public byte[] Salt { get; set; }
     public byte[] CryptoKeys { get; set; }
-    public DateTime LoginExpiresOn { get; set; }
-    public DateTime LoginCreatedOn { get; set; }
+    public DateTime? LoginExpiresOn { get; set; }
+    public DateTime? LoginCreatedOn { get; set; }
 }

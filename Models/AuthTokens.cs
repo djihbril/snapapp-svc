@@ -6,3 +6,9 @@ public class AccessToken
     public required UserRoles Role { get; set; }
     public required DateTime IssuedOn { get; set; }
 }
+
+public class RefreshToken
+{
+    public required Guid UserId { get; set; }
+     public required DateTime ExpiresOn { get; set; }
+}

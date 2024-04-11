@@ -63,13 +63,38 @@ GO
 
 CREATE PROC GetLoginInfo
 (
-	@email NVARCHAR(40)
+    @email NVARCHAR(40)
 )
 AS
+    SELECT
+        l.Id, u.Id AS UserId, u.Email AS UserEmail, u.[Password] AS UserPassword, u.Company AS UserCompany, u.FirstName AS UserFirstName, u.LastName AS UserLastName,
+        u.Phone AS UserPhone, u.[Role] AS UserRole, u.IsEmailVerified AS IsUserEmailVerified, u.Picture AS UserPicture, u.CreatedOn AS UserCreatedOn, u.Salt, l.CryptoKeys,
+        l.ExpiresOn AS LoginExpiresOn, l.CreatedOn AS LoginCreatedOn
+    FROM Users u left join Logins l ON u.Id = l.UserId WHERE Email = @email
+GO
 
-	SELECT
-		l.Id, u.Id AS UserId, u.Email AS UserEmail, u.[Password] AS UserPassword, u.Company AS UserCompany, u.FirstName AS UserFirstName, u.LastName AS UserLastName,
-		u.Phone AS UserPhone, u.[Role] AS UserRole, u.IsEmailVerified AS IsUserEmailVerified, u.Picture AS UserPicture, u.CreatedOn AS UserCreatedOn, u.Salt, l.CryptoKeys,
-		l.ExpiresOn AS LoginExpiresOn, l.CreatedOn AS LoginCreatedOn
-	FROM Users u join Logins l ON u.Id = l.UserId WHERE Email = @email
+DROP PROCEDURE IF EXISTS GetLoginInfoByUserId;
+GO
+
+CREATE PROC GetLoginInfoByUserId
+(
+    @userId UNIQUEIDENTIFIER
+)
+AS
+    SELECT
+        l.Id, u.Id AS UserId, u.Email AS UserEmail, u.[Password] AS UserPassword, u.Company AS UserCompany, u.FirstName AS UserFirstName, u.LastName AS UserLastName,
+        u.Phone AS UserPhone, u.[Role] AS UserRole, u.IsEmailVerified AS IsUserEmailVerified, u.Picture AS UserPicture, u.CreatedOn AS UserCreatedOn, u.Salt, l.CryptoKeys,
+        l.ExpiresOn AS LoginExpiresOn, l.CreatedOn AS LoginCreatedOn
+    FROM Users u left join Logins l ON u.Id = l.UserId WHERE u.Id = @userId
+GO
+
+DROP PROCEDURE IF EXISTS DeleteLoginByUserId;
+GO
+
+CREATE PROC DeleteLoginByUserId
+(
+    @userId UNIQUEIDENTIFIER
+)
+AS
+    DELETE FROM Logins WHERE UserId = @userId
 GO

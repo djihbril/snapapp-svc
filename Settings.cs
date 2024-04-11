@@ -4,7 +4,7 @@ namespace SnapApp.Svc;
 
 public static class Settings
 {
-    public static int TokenExpirationSpanInSecs => GetEnvironmentVariable<int>("TokenExpirationSpanInSecs");
+    public static int AccessTokenExpirationSpanInSecs => GetEnvironmentVariable<int>("AccessTokenExpirationSpanInHours") * 3600;
 
     public static string? SqlConnectionString => GetEnvironmentVariable("SqlConnectionString");
 

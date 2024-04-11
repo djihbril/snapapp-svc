@@ -55,7 +55,7 @@ public class Auth(ILogger<Auth> logger)
         {
             UserId = loginInfo.UserId,
             CryptoKeys = loginInfo.CryptoKeys,
-            ExpiresOn = now.AddSeconds(Settings.TokenExpirationSpanInSecs),
+            ExpiresOn = now.AddSeconds(Settings.AccessTokenExpirationSpanInSecs),
             CreatedOn = now
         };
 
@@ -181,7 +181,7 @@ public class Auth(ILogger<Auth> logger)
                 {
                     UserId = userId,
                     CryptoKeys = rsa.ExportCspBlob(true),
-                    ExpiresOn = now.AddSeconds(Settings.TokenExpirationSpanInSecs),
+                    ExpiresOn = now.AddSeconds(Settings.AccessTokenExpirationSpanInSecs),
                     CreatedOn = now
                 },
                 HttpResponse = resp

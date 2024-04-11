@@ -6,6 +6,8 @@ public static class Settings
 {
     public static int AccessTokenExpirationSpanInSecs => GetEnvironmentVariable<int>("AccessTokenExpirationSpanInHours") * 3600;
 
+    public static int RefreshTokenExpirationSpanInSecs => GetEnvironmentVariable<int>("RefreshTokenExpirationSpanInDays") * 86400;
+
     public static string? SqlConnectionString => GetEnvironmentVariable("SqlConnectionString");
 
     private static string? GetEnvironmentVariable(string name) => Environment.GetEnvironmentVariable(name, EnvironmentVariableTarget.Process);

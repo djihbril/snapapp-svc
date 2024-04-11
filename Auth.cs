@@ -59,13 +59,6 @@ public class Auth(ILogger<Auth> logger)
             CreatedOn = now
         };
 
-        AccessToken accessToken = new()
-        {
-            UserId = loginInfo.UserId,
-            Role = loginInfo.UserRole,
-            IssuedOn = now
-        };
-
         if (loginInfo.LoginCreatedOn != null)
         {
             // Set the new login Id with the existing login id so that the login recorded is updated.
@@ -79,8 +72,19 @@ public class Auth(ILogger<Auth> logger)
         using RSACryptoServiceProvider rsa = new();
 
         rsa.ImportCspBlob(login.CryptoKeys);
-        string tokenJson = JsonSerializer.Serialize(accessToken, JsonSerializationOptions.CamelCaseNamingOptions);
-        string token = Convert.ToBase64String(rsa.Encrypt(Encoding.UTF8.GetBytes(tokenJson), false));
+        string accessTokenJson = JsonSerializer.Serialize(new AccessToken
+        {
+             UserId = loginInfo.UserId,
+            Role = loginInfo.UserRole,
+            IssuedOn = now
+        }, JsonSerializationOptions.CamelCaseNamingOptions);
+        string accessToken = Convert.ToBase64String(rsa.Encrypt(Encoding.UTF8.GetBytes(accessTokenJson), false));
+        string refreshTokenJson = JsonSerializer.Serialize(new RefreshToken
+        {
+            UserId = loginInfo.UserId,
+            ExpiresOn = now.AddSeconds(Settings.RefreshTokenExpirationSpanInSecs)
+        }, JsonSerializationOptions.CamelCaseNamingOptions);
+        string refreshToken = Convert.ToBase64String(rsa.Encrypt(Encoding.UTF8.GetBytes(refreshTokenJson), false));
 
         resp.Headers.Add("Content-Type", "application/json; charset=utf-8");
         resp.StatusCode = HttpStatusCode.OK;
@@ -99,7 +103,8 @@ public class Auth(ILogger<Auth> logger)
                 IsEmailVerified = loginInfo.IsUserEmailVerified,
                 CreatedOn = loginInfo.UserCreatedOn
             },
-            AccessToken = token
+            AccessToken = accessToken,
+            RefreshToken = refreshToken
         }, JsonSerializationOptions.CamelCaseNamingOptions));
 
         return new LoginResult
@@ -151,11 +156,17 @@ public class Auth(ILogger<Auth> logger)
                 CreatedOn = now
             };
 
-            string tokenJson = JsonSerializer.Serialize(new AccessToken
+            string accessTokenJson = JsonSerializer.Serialize(new AccessToken
             {
                 UserId = userId,
                 Role = signUp.Role,
                 IssuedOn = now
+            }, JsonSerializationOptions.CamelCaseNamingOptions);
+
+            string refreshTokenJson = JsonSerializer.Serialize(new RefreshToken
+            {
+                UserId = userId,
+                ExpiresOn = now.AddSeconds(Settings.RefreshTokenExpirationSpanInSecs)
             }, JsonSerializationOptions.CamelCaseNamingOptions);
 
             using RSACryptoServiceProvider rsa = new(2048);
@@ -163,7 +174,8 @@ public class Auth(ILogger<Auth> logger)
             user.Salt = CryptoHelpers.GenerateSalt();
 
             user.Password = signUp.Password.HashPassword(user.Salt);
-            string token = Convert.ToBase64String(rsa.Encrypt(Encoding.UTF8.GetBytes(tokenJson), false));
+            string accessToken = Convert.ToBase64String(rsa.Encrypt(Encoding.UTF8.GetBytes(accessTokenJson), false));
+            string refreshToken = Convert.ToBase64String(rsa.Encrypt(Encoding.UTF8.GetBytes(refreshTokenJson), false));
 
             resp.Headers.Add("Content-Type", "application/json; charset=utf-8");
             resp.StatusCode = HttpStatusCode.OK;
@@ -171,7 +183,8 @@ public class Auth(ILogger<Auth> logger)
             {
                 UserId = userId,
                 UserCreatedOn = now,
-                AccessToken = token
+                AccessToken = accessToken,
+                RefreshToken = refreshTokenJson
             }, JsonSerializationOptions.CamelCaseNamingOptions));
 
             return new SignUpResult()

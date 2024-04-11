@@ -5,7 +5,7 @@ namespace SnapApp.Svc.Models;
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum UserRoles
 {
-    Realtor, Client
+    Client, Realtor
 }
 
 public class SignUp

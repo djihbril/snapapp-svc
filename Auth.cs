@@ -14,7 +14,7 @@ using FromBodyAttribute = Microsoft.Azure.Functions.Worker.Http.FromBodyAttribut
 
 namespace SnapApp.Svc;
 
-public class Auth(ILogger<Auth> logger)
+public class Auth(ILogger<Auth> logger, IDatabaseService dbContext)
 {
     [Function("Login")]
     public async Task<LoginResult> RunLogin([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req, [FromBody] Credentials creds,

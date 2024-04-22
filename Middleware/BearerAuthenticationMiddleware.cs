@@ -31,6 +31,15 @@ internal sealed class BearerAuthenticationMiddleware(IDatabaseService dbContext)
 
                     if (login.HasValue)
                     {
+                        if (login.Value.CryptoKeys == null)
+                        {
+                            HttpResponseData resp = requestData.CreateResponse(HttpStatusCode.Unauthorized);
+                            await resp.WriteStringAsync("Authentication failed.");
+                            context.GetInvocationResult().Value = resp;
+
+                            return;
+                        }
+
                         using RSACryptoServiceProvider rsa = new();
 
                         rsa.ImportCspBlob(login.Value.CryptoKeys);

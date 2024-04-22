@@ -32,7 +32,7 @@ internal sealed class BearerAuthenticationMiddleware(IDatabaseService dbContext)
                     if (login.HasValue)
                     {
                         using RSACryptoServiceProvider rsa = new();
-                        
+
                         rsa.ImportCspBlob(login.Value.CryptoKeys);
                         AccessToken? accessToken = null;
 
@@ -72,7 +72,6 @@ internal sealed class BearerAuthenticationMiddleware(IDatabaseService dbContext)
                                 else
                                 {
                                     responseMsg = "Authentication expired.";
-                                    await dbContext.DeleteLoginByUserIdAsync(userId);
                                 }
 
                                 HttpResponseData resp = requestData.CreateResponse(HttpStatusCode.Unauthorized);

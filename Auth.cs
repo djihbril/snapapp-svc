@@ -1,4 +1,5 @@
 using System.Net;
+using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -8,8 +9,10 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using SnapApp.Svc.DbModels;
 using SnapApp.Svc.Extensions;
+using SnapApp.Svc.Middleware;
 using SnapApp.Svc.Models;
 using SnapApp.Svc.ResponseTypes;
+using SnapApp.Svc.Services;
 using FromBodyAttribute = Microsoft.Azure.Functions.Worker.Http.FromBodyAttribute;
 
 namespace SnapApp.Svc;
@@ -217,5 +220,144 @@ public class Auth(ILogger<Auth> logger, IDatabaseService dbContext)
                 HttpResponse = resp
             };
         }
+    }
+
+    [Function("RenewToken")]
+    public async Task<HttpResponseData> RunRenewToken([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
+    {
+        logger.LogInformation("[RenewToken] function processed a request.");
+
+        HttpResponseData resp = req.CreateResponse();
+
+        if (req.Headers.TryGetValues("Authorization", out IEnumerable<string>? values))
+        {
+            string authorization = values.First();
+
+            if (authorization.StartsWith("Bearer "))
+            {
+                string token = authorization[(authorization.LastIndexOf(' ') + 1)..];
+
+                if (req.Headers.TryGetValues("X-UserId", out IEnumerable<string>? userIds) && Guid.TryParse(userIds.First(), out Guid userId))
+                {
+                    LoginInfo? loginInfo = await dbContext.GetLoginInfoByUserIdAsync(userId);
+
+                    if (loginInfo.HasValue)
+                    {
+                        if (loginInfo.Value.CryptoKeys == null)
+                        {
+                            resp.Headers.Add("Content-Type", "text/plain; charset=utf-8");
+                            resp.StatusCode = HttpStatusCode.Unauthorized;
+                            await resp.WriteStringAsync("Authentication failed.");
+
+                            return resp;
+                        }
+
+                        using RSACryptoServiceProvider rsa = new();
+
+                        rsa.ImportCspBlob(loginInfo.Value.CryptoKeys);
+                        RefreshToken? refreshTokenObj = null;
+
+                        try
+                        {
+                            string refreshTokenJson = Encoding.UTF8.GetString(rsa.Decrypt(Convert.FromBase64String(token), false));
+                            refreshTokenObj = JsonSerializer.Deserialize<RefreshToken>(refreshTokenJson, JsonSerializationOptions.CamelCaseNamingOptions);
+                        }
+                        catch
+                        {
+                            resp.Headers.Add("Content-Type", "text/plain; charset=utf-8");
+                            resp.StatusCode = HttpStatusCode.Unauthorized;
+                            await resp.WriteStringAsync("Invalid token.");
+
+                            return resp;
+                        }
+
+                        if (refreshTokenObj != null)
+                        {
+                            DateTime now = DateTime.UtcNow;
+                            Guid refreshTokenId = Guid.NewGuid();
+                            bool isValidToken = refreshTokenObj.UserId == loginInfo.Value.UserId && refreshTokenObj.Id == loginInfo.Value.RefreshTokenId;
+                            bool isAuthExpired = refreshTokenObj.ExpiresOn < now;
+
+                            if (isValidToken && !isAuthExpired)
+                            {
+                                string accessTokenJson = JsonSerializer.Serialize(new AccessToken
+                                {
+                                    UserId = userId,
+                                    Role = loginInfo.Value.UserRole,
+                                    IssuedOn = now
+                                }, JsonSerializationOptions.CamelCaseNamingOptions);
+
+                                string refreshTokenJson = JsonSerializer.Serialize(new RefreshToken
+                                {
+                                    Id = refreshTokenId,
+                                    UserId = userId,
+                                    ExpiresOn = now.AddSeconds(Settings.RefreshTokenExpirationSpanInSecs)
+                                }, JsonSerializationOptions.CamelCaseNamingOptions);
+
+                                string accessToken = Convert.ToBase64String(rsa.Encrypt(Encoding.UTF8.GetBytes(accessTokenJson), false));
+                                string refreshToken = Convert.ToBase64String(rsa.Encrypt(Encoding.UTF8.GetBytes(refreshTokenJson), false));
+
+                                resp.Headers.Add("Content-Type", "application/json; charset=utf-8");
+                                resp.StatusCode = HttpStatusCode.OK;
+                                await resp.WriteStringAsync(JsonSerializer.Serialize(new
+                                {
+                                    AccessToken = accessToken,
+                                    RefreshToken = refreshToken
+                                }, JsonSerializationOptions.CamelCaseNamingOptions));
+
+                                await dbContext.UpsertLoginAsync(new()
+                                {
+                                    Id = loginInfo.Value.Id,
+                                    UserId = userId,
+                                    CryptoKeys = loginInfo.Value.CryptoKeys,
+                                    RefreshTokenId = refreshTokenId,
+                                    ExpiresOn = now.AddSeconds(Settings.AccessTokenExpirationSpanInSecs),
+                                    CreatedOn = now
+                                });
+                            }
+                            else
+                            {
+                                resp.Headers.Add("Content-Type", "text/plain; charset=utf-8");
+                                resp.StatusCode = HttpStatusCode.Unauthorized;
+                                await resp.WriteStringAsync(isAuthExpired ? "Authentication expired." : "Invalid token.");
+
+                                if (isAuthExpired)
+                                {
+                                    await dbContext.DeleteLoginByUserIdAsync(userId);
+                                }
+                            }
+
+                            return resp;
+                        }
+                    }
+                }
+            }
+        }
+
+        resp.Headers.Add("Content-Type", "text/plain; charset=utf-8");
+        resp.StatusCode = HttpStatusCode.Unauthorized;
+        await resp.WriteStringAsync("Authentication failed.");
+
+        return resp;
+    }
+
+    [FunctionAuthorize]
+    [Function("Logout")]
+    public async Task<HttpResponseData> RunLogout([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
+    {
+        logger.LogInformation("[Logout] function processed a request.");
+
+        HttpResponseData resp = req.CreateResponse();
+        ClaimsPrincipal user = req.FunctionContext.GetHttpContext()!.User;
+        resp.Headers.Add("Content-Type", "text/plain; charset=utf-8");
+        resp.StatusCode = HttpStatusCode.OK;
+
+        if (user.Identity!.IsAuthenticated)
+        {
+            await dbContext.DeleteLoginByUserIdAsync(Guid.Parse(user.Claims.First(c => c.Type == "userId").Value));
+            await resp.WriteStringAsync($"{user.Identity.Name}");
+        }
+
+        return resp;
     }
 }

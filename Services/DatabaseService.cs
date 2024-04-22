@@ -7,7 +7,6 @@ namespace SnapApp.Svc.Services;
 public interface IDatabaseService
 {
     Task ConnectAsync();
-    Task DisconnectAsync();
     Task<LoginInfo?> GetLoginInfoByUserIdAsync(Guid userId);
     Task DeleteLoginByUserIdAsync(Guid userId);
 }
@@ -90,14 +89,6 @@ public class DatabaseContext(DbConnection ctn) : IDatabaseService
         }
     }
 
-    public async Task DisconnectAsync()
-    {
-        if (ctn.State == ConnectionState.Open)
-        {
-            await ctn.CloseAsync();
-        }
-    }
-
     public async Task<LoginInfo?> GetLoginInfoByUserIdAsync(Guid userId)
     {
         using DbCommand cmd = ctn.CreateCommand().AddParameter("@userId", DbType.Guid, userId);
@@ -105,7 +96,7 @@ public class DatabaseContext(DbConnection ctn) : IDatabaseService
         cmd.CommandText = "GetLoginInfoByUserId";
         cmd.CommandType = CommandType.StoredProcedure;
         await ConnectAsync();
-        using DbDataReader reader = await cmd.ExecuteReaderAsync(CommandBehavior.CloseConnection);
+        using DbDataReader reader = await cmd.ExecuteReaderAsync();
         List<LoginInfo> logins = reader.Parse<LoginInfo>();
 
         return logins.Count != 0 ? logins.First() : null;
@@ -119,6 +110,5 @@ public class DatabaseContext(DbConnection ctn) : IDatabaseService
         cmd.CommandType = CommandType.StoredProcedure;
         await ConnectAsync();
         await cmd.ExecuteNonQueryAsync();
-        await DisconnectAsync();
     }
 }

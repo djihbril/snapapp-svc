@@ -14,6 +14,7 @@ public struct LoginInfo
     public bool IsUserEmailVerified { get; set; }
     public string UserPicture { get; set; }
     public DateTime UserCreatedOn { get; set; }
+    public Guid? RefreshTokenId { get; set; }
     public byte[] Salt { get; set; }
     public byte[] CryptoKeys { get; set; }
     public DateTime? LoginExpiresOn { get; set; }

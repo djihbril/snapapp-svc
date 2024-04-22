@@ -50,11 +50,13 @@ public class Auth(ILogger<Auth> logger, IDatabaseService dbContext)
         }
 
         DateTime now = DateTime.UtcNow;
+        Guid refreshTokenId = Guid.NewGuid();
 
         Login login = new()
         {
             UserId = loginInfo.UserId,
             CryptoKeys = loginInfo.CryptoKeys,
+            RefreshTokenId = refreshTokenId,
             ExpiresOn = now.AddSeconds(Settings.AccessTokenExpirationSpanInSecs),
             CreatedOn = now
         };
@@ -81,6 +83,7 @@ public class Auth(ILogger<Auth> logger, IDatabaseService dbContext)
         string accessToken = Convert.ToBase64String(rsa.Encrypt(Encoding.UTF8.GetBytes(accessTokenJson), false));
         string refreshTokenJson = JsonSerializer.Serialize(new RefreshToken
         {
+            Id = refreshTokenId,
             UserId = loginInfo.UserId,
             ExpiresOn = now.AddSeconds(Settings.RefreshTokenExpirationSpanInSecs)
         }, JsonSerializationOptions.CamelCaseNamingOptions);
@@ -141,6 +144,7 @@ public class Auth(ILogger<Auth> logger, IDatabaseService dbContext)
         {
             DateTime now = DateTime.UtcNow;
             Guid userId = Guid.NewGuid();
+            Guid refreshTokenId = Guid.NewGuid();
 
             User user = new()
             {
@@ -165,6 +169,7 @@ public class Auth(ILogger<Auth> logger, IDatabaseService dbContext)
 
             string refreshTokenJson = JsonSerializer.Serialize(new RefreshToken
             {
+                Id = refreshTokenId,
                 UserId = userId,
                 ExpiresOn = now.AddSeconds(Settings.RefreshTokenExpirationSpanInSecs)
             }, JsonSerializationOptions.CamelCaseNamingOptions);
@@ -184,7 +189,7 @@ public class Auth(ILogger<Auth> logger, IDatabaseService dbContext)
                 UserId = userId,
                 UserCreatedOn = now,
                 AccessToken = accessToken,
-                RefreshToken = refreshTokenJson
+                RefreshToken = refreshToken
             }, JsonSerializationOptions.CamelCaseNamingOptions));
 
             return new SignUpResult()
@@ -194,6 +199,7 @@ public class Auth(ILogger<Auth> logger, IDatabaseService dbContext)
                 {
                     UserId = userId,
                     CryptoKeys = rsa.ExportCspBlob(true),
+                    RefreshTokenId = refreshTokenId,
                     ExpiresOn = now.AddSeconds(Settings.AccessTokenExpirationSpanInSecs),
                     CreatedOn = now
                 },

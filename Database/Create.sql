@@ -38,10 +38,12 @@ CREATE TABLE Logins
     [Id] INT IDENTITY(1,1) PRIMARY KEY,
     [UserId] UNIQUEIDENTIFIER NOT NULL,
     [CryptoKeys] BINARY(1172) NOT NULL,
+    [RefreshTokenId] UNIQUEIDENTIFIER NOT NULL,
     [ExpiresOn] DATETIME2 DEFAULT GETUTCDATE(),
     [CreatedOn] DATETIME2 DEFAULT GETUTCDATE(),
     FOREIGN KEY(UserId) REFERENCES Users(Id)
 );
+GO
 
 DROP PROCEDURE IF EXISTS CheckExistingUser;
 GO
@@ -68,8 +70,8 @@ CREATE PROC GetLoginInfo
 AS
     SELECT
         l.Id, u.Id AS UserId, u.Email AS UserEmail, u.[Password] AS UserPassword, u.Company AS UserCompany, u.FirstName AS UserFirstName, u.LastName AS UserLastName,
-        u.Phone AS UserPhone, u.[Role] AS UserRole, u.IsEmailVerified AS IsUserEmailVerified, u.Picture AS UserPicture, u.CreatedOn AS UserCreatedOn, u.Salt, l.CryptoKeys,
-        l.ExpiresOn AS LoginExpiresOn, l.CreatedOn AS LoginCreatedOn
+        u.Phone AS UserPhone, u.[Role] AS UserRole, u.IsEmailVerified AS IsUserEmailVerified, u.Picture AS UserPicture, u.CreatedOn AS UserCreatedOn, l.RefreshTokenId,
+        u.Salt, l.CryptoKeys, l.ExpiresOn AS LoginExpiresOn, l.CreatedOn AS LoginCreatedOn
     FROM Users u left join Logins l ON u.Id = l.UserId WHERE Email = @email
 GO
 
@@ -83,8 +85,8 @@ CREATE PROC GetLoginInfoByUserId
 AS
     SELECT
         l.Id, u.Id AS UserId, u.Email AS UserEmail, u.[Password] AS UserPassword, u.Company AS UserCompany, u.FirstName AS UserFirstName, u.LastName AS UserLastName,
-        u.Phone AS UserPhone, u.[Role] AS UserRole, u.IsEmailVerified AS IsUserEmailVerified, u.Picture AS UserPicture, u.CreatedOn AS UserCreatedOn, u.Salt, l.CryptoKeys,
-        l.ExpiresOn AS LoginExpiresOn, l.CreatedOn AS LoginCreatedOn
+        u.Phone AS UserPhone, u.[Role] AS UserRole, u.IsEmailVerified AS IsUserEmailVerified, u.Picture AS UserPicture, u.CreatedOn AS UserCreatedOn, l.RefreshTokenId,
+        u.Salt, l.CryptoKeys, l.ExpiresOn AS LoginExpiresOn, l.CreatedOn AS LoginCreatedOn
     FROM Users u left join Logins l ON u.Id = l.UserId WHERE u.Id = @userId
 GO
 

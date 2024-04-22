@@ -100,3 +100,42 @@ CREATE PROC DeleteLoginByUserId
 AS
     DELETE FROM Logins WHERE UserId = @userId
 GO
+
+DROP PROCEDURE IF EXISTS InsertLogin;
+GO
+
+CREATE PROC InsertLogin
+(
+    @id INT OUTPUT,
+    @userId UNIQUEIDENTIFIER,
+    @cryptoKeys BINARY(1172),
+    @refreshTokenId UNIQUEIDENTIFIER,
+    @expiresOn DATETIME2,
+    @createdOn DATETIME2
+)
+AS
+    INSERT INTO Logins (UserId, CryptoKeys, RefreshTokenId, ExpiresOn, CreatedOn) VALUES (@userId, @cryptoKeys, @refreshTokenId, @expiresOn, @CreatedOn);
+    SET @id = SCOPE_IDENTITY();
+GO
+
+DROP PROCEDURE IF EXISTS UpdateLogin;
+GO
+
+CREATE PROC UpdateLogin
+(
+    @id INT,
+    @userId UNIQUEIDENTIFIER,
+    @cryptoKeys BINARY(1172),
+    @refreshTokenId UNIQUEIDENTIFIER,
+    @expiresOn DATETIME2,
+    @createdOn DATETIME2
+)
+AS
+    UPDATE Logins SET
+        UserId = @userId,
+        CryptoKeys = @cryptoKeys,
+        RefreshTokenId = @refreshTokenId,
+        ExpiresOn = @expiresOn,
+        CreatedOn = @createdOn
+    WHERE Id = @id;
+GO

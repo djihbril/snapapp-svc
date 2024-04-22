@@ -1,5 +1,6 @@
 using System.Data;
 using System.Data.Common;
+using SnapApp.Svc.DbModels;
 using SnapApp.Svc.Models;
 
 namespace SnapApp.Svc.Services;
@@ -9,6 +10,7 @@ public interface IDatabaseService
     Task ConnectAsync();
     Task<LoginInfo?> GetLoginInfoByUserIdAsync(Guid userId);
     Task DeleteLoginByUserIdAsync(Guid userId);
+    Task<int?> UpsertLoginAsync(Login login);
 }
 
 internal static class DbCommandExtensions
@@ -20,6 +22,17 @@ internal static class DbCommandExtensions
         param.DbType = type;
         param.Value = value;
         cmd.Parameters.Add(param);
+
+        return cmd;
+    }
+
+    public static DbCommand AddParameter(this DbCommand cmd, string name, DbType type, out DbParameter outParam)
+    {
+        outParam = cmd.CreateParameter();
+        outParam.ParameterName = name;
+        outParam.DbType = type;
+        outParam.Direction = ParameterDirection.Output;
+        cmd.Parameters.Add(outParam);
 
         return cmd;
     }
@@ -110,5 +123,36 @@ public class DatabaseContext(DbConnection ctn) : IDatabaseService
         cmd.CommandType = CommandType.StoredProcedure;
         await ConnectAsync();
         await cmd.ExecuteNonQueryAsync();
+    }
+
+    public async Task<int?> UpsertLoginAsync(Login login)
+    {
+        using DbCommand cmd = ctn.CreateCommand();
+
+        cmd.CommandType = CommandType.StoredProcedure;
+        cmd.AddParameter("@userId", DbType.Guid, login.UserId);
+        cmd.AddParameter("@cryptoKeys", DbType.Binary, login.CryptoKeys);
+        cmd.AddParameter("@refreshTokenId", DbType.Guid, login.RefreshTokenId);
+        cmd.AddParameter("@expiresOn", DbType.DateTime2, login.ExpiresOn);
+        cmd.AddParameter("@createdOn", DbType.DateTime2, login.CreatedOn);
+
+        await ConnectAsync();
+
+        if (login.Id == null)
+        {
+            cmd.AddParameter("@id", DbType.Int32, out var outParam);
+            cmd.CommandText = "InsertLogin";
+            await cmd.ExecuteNonQueryAsync();
+
+            return (int?)outParam.Value;
+        }
+        else
+        {
+            cmd.CommandText = "UpdateLogin";
+            cmd.AddParameter("@id", DbType.Int32, login.Id);
+            await cmd.ExecuteNonQueryAsync();
+
+            return login.Id;
+        }
     }
 }

@@ -158,7 +158,7 @@ public class Auth(ILogger<Auth> logger, IDatabaseService dbContext)
                 FirstName = signUp.FirstName,
                 LastName = signUp.LastName,
                 Phone = signUp.Phone,
-                Role = signUp.Role,
+                Role = signUp.Role,     // Always Realtor.
                 Salt = [],
                 CreatedOn = now
             };

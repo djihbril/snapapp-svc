@@ -9,6 +9,7 @@ public interface IDatabaseService
 {
     Task ConnectAsync();
     Task<LoginInfo?> GetLoginInfoByUserIdAsync(Guid userId);
+    Task<UserInfo?> GetUserInfoByIdAsync(Guid id);
     Task DeleteLoginByUserIdAsync(Guid userId);
     Task<int?> UpsertLoginAsync(Login login);
 }
@@ -113,6 +114,19 @@ public class DatabaseContext(DbConnection ctn) : IDatabaseService
         List<LoginInfo> logins = reader.Parse<LoginInfo>();
 
         return logins.Count != 0 ? logins.First() : null;
+    }
+
+    public async Task<UserInfo?> GetUserInfoByIdAsync(Guid id)
+    {
+        using DbCommand cmd = ctn.CreateCommand().AddParameter("@id", DbType.Guid, id);
+
+        cmd.CommandText = "GetUserInfoById";
+        cmd.CommandType = CommandType.StoredProcedure;
+        await ConnectAsync();
+        using DbDataReader reader = await cmd.ExecuteReaderAsync();
+        List<UserInfo> users = reader.Parse<UserInfo>();
+
+        return users.Count != 0 ? users.First() : null;
     }
 
     public async Task DeleteLoginByUserIdAsync(Guid userId)

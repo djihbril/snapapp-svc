@@ -139,3 +139,16 @@ AS
         CreatedOn = @createdOn
     WHERE Id = @id;
 GO
+
+DROP PROCEDURE IF EXISTS GetUserInfoById;
+GO
+
+CREATE PROC GetUserInfoById
+(
+    @id UNIQUEIDENTIFIER
+)
+AS
+    SELECT
+        Id, Email, [Password], Company, FirstName, LastName, Phone, [Role], IsEmailVerified, Picture, Salt, CreatedOn
+    FROM Users WHERE Id = @id
+GO

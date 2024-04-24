@@ -222,6 +222,73 @@ public class Auth(ILogger<Auth> logger, IDatabaseService dbContext)
         }
     }
 
+    [Function("Verify")]
+    public async Task <UserResult> RunVerify([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "verify/{token}")] HttpRequestData req, string token)
+    {
+        logger.LogInformation("[Verify] function processed a request.");
+
+        HttpResponseData resp = req.CreateResponse();
+        resp.Headers.Add("Content-Type", "text/plain; charset=utf-8");
+        Guid userId;
+
+        try
+        {
+            userId = Guid.Parse(token.Decode().Deobfuscate());
+        }
+        catch
+        {
+            userId = Guid.Empty;
+        }
+
+        UserInfo? userInfoObj = userId == Guid.Empty ? null : dbContext.GetUserInfoByIdAsync(userId).Result;
+
+        if (userInfoObj != null)
+        {
+            UserInfo userInfo = userInfoObj.Value;
+
+            if (!userInfo.IsEmailVerified)
+            {
+                resp.StatusCode = HttpStatusCode.OK;
+                await resp.WriteStringAsync($"Thank you for verifying your email.");
+
+                return new UserResult()
+                {
+                    User = new()
+                    {
+                        Id = userInfo.Id,
+                        Email = userInfo.Email,
+                        Password = userInfo.Password,
+                        Company = userInfo.Company,
+                        FirstName = userInfo.FirstName,
+                        LastName = userInfo.LastName,
+                        Phone = userInfo.Phone,
+                        Role = userInfo.Role,
+                        Salt = userInfo.Salt,
+                        CreatedOn = userInfo.CreatedOn!.Value,
+                        IsEmailVerified = true
+                    },
+                    HttpResponse = resp
+                };
+            }
+
+            resp.StatusCode = HttpStatusCode.OK;
+            await resp.WriteStringAsync($"Email already verified.");
+
+            return new UserResult()
+            {
+                HttpResponse = resp
+            };
+        }
+
+        resp.StatusCode = HttpStatusCode.BadRequest;
+        await resp.WriteStringAsync("Invalid token.");
+
+        return new UserResult()
+        {
+            HttpResponse = resp
+        };
+    }
+
     [Function("RenewToken")]
     public async Task<HttpResponseData> RunRenewToken([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req)
     {

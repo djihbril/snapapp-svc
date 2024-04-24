@@ -1,3 +1,5 @@
+using SnapApp.Svc.Models;
+
 namespace SnapApp.Svc.DbModels;
 
 public class User
@@ -9,7 +11,7 @@ public class User
     public required string FirstName { get; set; }
     public required string LastName { get; set; }
     public required string Phone { get; set; }
-    public required Models.UserRoles Role { get; set; }
+    public required UserRoles Role { get; set; }
     public bool IsEmailVerified { get; set; }
     public string? Picture { get; set; }
     public required byte[] Salt { get; set; }

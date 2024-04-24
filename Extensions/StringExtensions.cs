@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace SnapApp.Svc.Extensions;
@@ -41,11 +42,15 @@ public static partial class StringExtensions
     public static string HashPassword(this string input, byte[] salt)
     {
         using var pbkdf2 = new Rfc2898DeriveBytes(input, salt, 100000, HashAlgorithmName.SHA256);
-        byte[] hashBytes = pbkdf2.GetBytes(256 / 8); // 256 bits (32 bytes)
+        byte[] hashBytes = pbkdf2.GetBytes(256 / 8); // 256 bits (32 bytes).
         return Convert.ToBase64String(hashBytes);
     }
 
     public static string Obfuscate(this string input) => input.Caesar(59);
 
-    public static string DeObfuscate(this string input) => input.Caesar(-59);
+    public static string Deobfuscate(this string input) => input.Caesar(-59);
+
+    public static string Encode(this string input) => Convert.ToBase64String(Encoding.UTF8.GetBytes(input));
+
+    public static string Decode(this string input) => Encoding.UTF8.GetString(Convert.FromBase64String(input));
 }

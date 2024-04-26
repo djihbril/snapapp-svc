@@ -259,7 +259,7 @@ public class Auth(ILogger<Auth> logger, IDatabaseService dbContext, IEmailCommun
 
         try
         {
-            userId = Guid.Parse(token.Decode().Deobfuscate());
+            userId = Guid.Parse(HttpUtility.UrlDecode(token).Decode().Deobfuscate());
         }
         catch
         {

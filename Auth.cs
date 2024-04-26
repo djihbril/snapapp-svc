@@ -255,7 +255,7 @@ public class Auth(ILogger<Auth> logger, IDatabaseService dbContext, IEmailCommun
 
         HttpResponseData resp = req.CreateResponse();
         resp.Headers.Add("Content-Type", "text/plain; charset=utf-8");
-        Guid userId;
+        Guid? userId;
 
         try
         {
@@ -263,10 +263,10 @@ public class Auth(ILogger<Auth> logger, IDatabaseService dbContext, IEmailCommun
         }
         catch
         {
-            userId = Guid.Empty;
+            userId = null;
         }
 
-        UserInfo? userInfoObj = userId == Guid.Empty ? null : dbContext.GetUserInfoByIdAsync(userId).Result;
+        UserInfo? userInfoObj = userId == null ? null : dbContext.GetUserInfoByIdAsync(userId.Value).Result;
 
         if (userInfoObj != null)
         {
@@ -281,7 +281,7 @@ public class Auth(ILogger<Auth> logger, IDatabaseService dbContext, IEmailCommun
                 {
                     User = new()
                     {
-                        Id = userInfo.Id,
+                        Id = userInfo.Id!.Value,
                         Email = userInfo.Email,
                         Password = userInfo.Password,
                         Company = userInfo.Company,

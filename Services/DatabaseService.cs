@@ -8,6 +8,7 @@ namespace SnapApp.Svc.Services;
 public interface IDatabaseService
 {
     Task ConnectAsync();
+    Task DisconnectAsync();
     Task<LoginInfo?> GetLoginInfoByUserIdAsync(Guid userId);
     Task<UserInfo?> GetUserInfoByIdAsync(Guid id);
     Task DeleteLoginByUserIdAsync(Guid userId);
@@ -103,6 +104,14 @@ public class DatabaseContext(DbConnection ctn) : IDatabaseService
         }
     }
 
+    public async Task DisconnectAsync()
+    {
+        if (ctn.State == ConnectionState.Open)
+        {
+            await ctn.CloseAsync();
+        }
+    }
+
     public async Task<LoginInfo?> GetLoginInfoByUserIdAsync(Guid userId)
     {
         using DbCommand cmd = ctn.CreateCommand().AddParameter("@userId", DbType.Guid, userId);
@@ -110,7 +119,7 @@ public class DatabaseContext(DbConnection ctn) : IDatabaseService
         cmd.CommandText = "GetLoginInfoByUserId";
         cmd.CommandType = CommandType.StoredProcedure;
         await ConnectAsync();
-        using DbDataReader reader = await cmd.ExecuteReaderAsync();
+        using DbDataReader reader = await cmd.ExecuteReaderAsync(CommandBehavior.CloseConnection);
         List<LoginInfo> logins = reader.Parse<LoginInfo>();
 
         return logins.Count != 0 ? logins.First() : null;
@@ -123,7 +132,7 @@ public class DatabaseContext(DbConnection ctn) : IDatabaseService
         cmd.CommandText = "GetUserInfoById";
         cmd.CommandType = CommandType.StoredProcedure;
         await ConnectAsync();
-        using DbDataReader reader = await cmd.ExecuteReaderAsync();
+        using DbDataReader reader = await cmd.ExecuteReaderAsync(CommandBehavior.CloseConnection);
         List<UserInfo> users = reader.Parse<UserInfo>();
 
         return users.Count != 0 ? users.First() : null;
@@ -136,7 +145,15 @@ public class DatabaseContext(DbConnection ctn) : IDatabaseService
         cmd.CommandText = "DeleteLoginByUserId";
         cmd.CommandType = CommandType.StoredProcedure;
         await ConnectAsync();
-        await cmd.ExecuteNonQueryAsync();
+
+        try
+        {
+            await cmd.ExecuteNonQueryAsync();
+        }
+        finally
+        {
+            await DisconnectAsync();
+        }
     }
 
     public async Task<int?> UpsertLoginAsync(Login login)
@@ -152,21 +169,28 @@ public class DatabaseContext(DbConnection ctn) : IDatabaseService
 
         await ConnectAsync();
 
-        if (login.Id == null)
+        try
         {
-            cmd.AddParameter("@id", DbType.Int32, out var outParam);
-            cmd.CommandText = "InsertLogin";
-            await cmd.ExecuteNonQueryAsync();
+            if (login.Id == null)
+            {
+                cmd.AddParameter("@id", DbType.Int32, out var outParam);
+                cmd.CommandText = "InsertLogin";
+                await cmd.ExecuteNonQueryAsync();
 
-            return (int?)outParam.Value;
+                return (int?)outParam.Value;
+            }
+            else
+            {
+                cmd.CommandText = "UpdateLogin";
+                cmd.AddParameter("@id", DbType.Int32, login.Id);
+                await cmd.ExecuteNonQueryAsync();
+
+                return login.Id;
+            }
         }
-        else
+        finally
         {
-            cmd.CommandText = "UpdateLogin";
-            cmd.AddParameter("@id", DbType.Int32, login.Id);
-            await cmd.ExecuteNonQueryAsync();
-
-            return login.Id;
+            await DisconnectAsync();
         }
     }
 }

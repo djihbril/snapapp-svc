@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Web;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Extensions.Sql;
 using Microsoft.Azure.Functions.Worker.Http;
@@ -17,7 +18,7 @@ using FromBodyAttribute = Microsoft.Azure.Functions.Worker.Http.FromBodyAttribut
 
 namespace SnapApp.Svc;
 
-public class Auth(ILogger<Auth> logger, IDatabaseService dbContext)
+public class Auth(ILogger<Auth> logger, IDatabaseService dbContext, IEmailCommunicationService emailService)
 {
     [Function("Login")]
     public async Task<LoginResult> RunLogin([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req, [FromBody] Credentials creds,
@@ -180,32 +181,57 @@ public class Auth(ILogger<Auth> logger, IDatabaseService dbContext)
             using RSACryptoServiceProvider rsa = new(2048);
 
             user.Salt = CryptoHelpers.GenerateSalt();
-
             user.Password = signUp.Password.HashPassword(user.Salt);
             string accessToken = Convert.ToBase64String(rsa.Encrypt(Encoding.UTF8.GetBytes(accessTokenJson), false));
             string refreshToken = Convert.ToBase64String(rsa.Encrypt(Encoding.UTF8.GetBytes(refreshTokenJson), false));
+            string verifyToken = HttpUtility.UrlEncode(userId.ToString().Obfuscate().Encode());
 
-            resp.Headers.Add("Content-Type", "application/json; charset=utf-8");
-            resp.StatusCode = HttpStatusCode.OK;
-            await resp.WriteStringAsync(JsonSerializer.Serialize(new
+            Login login = new()
             {
                 UserId = userId,
-                UserCreatedOn = now,
-                AccessToken = accessToken,
-                RefreshToken = refreshToken
-            }, JsonSerializationOptions.CamelCaseNamingOptions));
+                CryptoKeys = rsa.ExportCspBlob(true),
+                RefreshTokenId = refreshTokenId,
+                ExpiresOn = now.AddSeconds(Settings.AccessTokenExpirationSpanInSecs),
+                CreatedOn = now
+            };
+
+            var templateData = new
+            {
+                logoLink = Settings.LogoLink,
+                recipientName = $"{user.FirstName}",
+                verifyLink = $"{req.Url.AbsoluteUri[..req.Url.AbsoluteUri.IndexOf(req.Url.LocalPath)]}/api/verify/{verifyToken}",
+                senderAddress = Settings.EmailSenderAddress
+            };
+
+            string emailHtmlContent = EmailTemplates.verifyEmail.Format(templateData);
+
+            if (Settings.EmailSenderAddress != null &&
+                emailService.SendAsync(Settings.EmailSenderAddress, user.Email, "Verify you email address for SnapApp", emailHtmlContent).Result)
+            {
+                resp.Headers.Add("Content-Type", "application/json; charset=utf-8");
+                resp.StatusCode = HttpStatusCode.OK;
+                await resp.WriteStringAsync(JsonSerializer.Serialize(new
+                {
+                    UserId = userId,
+                    UserCreatedOn = now,
+                    AccessToken = accessToken,
+                    RefreshToken = refreshToken
+                }, JsonSerializationOptions.CamelCaseNamingOptions));
+
+                return new SignUpResult()
+                {
+                    User = user,
+                    Login = login,
+                    HttpResponse = resp
+                };
+            }
+
+            resp.Headers.Add("Content-Type", "text/plain; charset=utf-8");
+            resp.StatusCode = HttpStatusCode.BadRequest;
+            await resp.WriteStringAsync($"Unable to send verification email.");
 
             return new SignUpResult()
             {
-                User = user,
-                Login = new()
-                {
-                    UserId = userId,
-                    CryptoKeys = rsa.ExportCspBlob(true),
-                    RefreshTokenId = refreshTokenId,
-                    ExpiresOn = now.AddSeconds(Settings.AccessTokenExpirationSpanInSecs),
-                    CreatedOn = now
-                },
                 HttpResponse = resp
             };
         }

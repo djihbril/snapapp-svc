@@ -53,4 +53,18 @@ public static partial class StringExtensions
     public static string Encode(this string input) => Convert.ToBase64String(Encoding.UTF8.GetBytes(input));
 
     public static string Decode(this string input) => Encoding.UTF8.GetString(Convert.FromBase64String(input));
+
+    public static string Format(this string input, dynamic data)
+    {
+        StringBuilder output = new(input);
+
+        foreach(var prop in data.GetType().GetProperties())
+        {
+            string propName = prop.Name;
+            string propValue = prop.GetValue(data).ToString();
+            output.Replace($"{{{{{propName}}}}}", propValue);
+        }
+
+        return output.ToString();
+    }
 }

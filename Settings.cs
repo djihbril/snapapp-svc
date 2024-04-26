@@ -10,6 +10,12 @@ public static class Settings
 
     public static string? SqlConnectionString => GetEnvironmentVariable("SqlConnectionString");
 
+    public static string? ComServicesConnectionString => GetEnvironmentVariable("ComServicesConnectionString");
+
+    public static string? EmailSenderAddress => GetEnvironmentVariable("EmailSenderAddress");
+
+    public static string? LogoLink => GetEnvironmentVariable("LogoLink");
+
     private static string? GetEnvironmentVariable(string name) => Environment.GetEnvironmentVariable(name, EnvironmentVariableTarget.Process);
 
     private static T? GetEnvironmentVariable<T>(string name)

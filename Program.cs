@@ -7,6 +7,7 @@ using SnapApp.Svc.Services;
 using System.Data.Common;
 using Microsoft.Data.SqlClient;
 using SnapApp.Svc;
+using Azure.Communication.Email;
 
 var host = new HostBuilder()
     .ConfigureFunctionsWebApplication(configure =>
@@ -25,6 +26,9 @@ var host = new HostBuilder()
 
         services.AddScoped<DbConnection>(provider => new SqlConnection(Settings.SqlConnectionString));
         services.AddScoped<IDatabaseService, DatabaseContext>();
+
+        services.AddSingleton(provider => new EmailClient(Settings.ComServicesConnectionString));
+        services.AddSingleton<IEmailCommunicationService, EmailService>();
     })
     .Build();
 

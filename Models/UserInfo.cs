@@ -14,4 +14,10 @@ public struct UserInfo
     public string Picture { get; set; }
     public byte[] Salt { get; set; }
     public DateTime? CreatedOn { get; set; }
+
+    public readonly bool HasRequiredData
+    {
+        get => !(string.IsNullOrWhiteSpace(Email) || string.IsNullOrWhiteSpace(Password) || string.IsNullOrWhiteSpace(Company) ||
+            string.IsNullOrWhiteSpace(FirstName) || string.IsNullOrWhiteSpace(LastName) || string.IsNullOrWhiteSpace(Phone));
+    }
 }

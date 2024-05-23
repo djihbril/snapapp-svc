@@ -16,6 +16,8 @@ public static class Settings
 
     public static string? LogoLink => GetEnvironmentVariable("LogoLink");
 
+    public static string? AppStoreLink => GetEnvironmentVariable("AppStoreLink");
+
     private static string? GetEnvironmentVariable(string name) => Environment.GetEnvironmentVariable(name, EnvironmentVariableTarget.Process);
 
     private static T? GetEnvironmentVariable<T>(string name)

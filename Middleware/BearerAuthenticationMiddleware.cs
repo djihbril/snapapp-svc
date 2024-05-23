@@ -52,7 +52,7 @@ internal sealed class BearerAuthenticationMiddleware(IDatabaseService dbContext)
                         }
                         catch
                         {
-                            HttpResponseData resp = requestData.CreateResponse(HttpStatusCode.Unauthorized);
+                            HttpResponseData resp = requestData.CreateResponse(HttpStatusCode.BadRequest);
                             await resp.WriteStringAsync("Invalid token.");
                             context.GetInvocationResult().Value = resp;
 
@@ -76,14 +76,14 @@ internal sealed class BearerAuthenticationMiddleware(IDatabaseService dbContext)
                                 }
                                 else if (!isInRole)
                                 {
-                                    responseMsg = "Unauthorized access attempt.";
+                                    responseMsg = "Access Unauthorized.";
                                 }
                                 else
                                 {
                                     responseMsg = "Authentication expired.";
                                 }
 
-                                HttpResponseData resp = requestData.CreateResponse(HttpStatusCode.Unauthorized);
+                                HttpResponseData resp = requestData.CreateResponse(!isValidToken ? HttpStatusCode.BadRequest : HttpStatusCode.Unauthorized);
                                 await resp.WriteStringAsync(responseMsg);
                                 context.GetInvocationResult().Value = resp;
 

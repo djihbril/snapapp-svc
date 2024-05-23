@@ -7,3 +7,9 @@ public enum UserRoles
 {
     Client, Realtor
 }
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum ClientTypes
+{
+    Buyer, Seller
+}

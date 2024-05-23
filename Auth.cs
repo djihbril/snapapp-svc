@@ -1,3 +1,4 @@
+using System.Data;
 using System.Net;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -22,7 +23,7 @@ public class Auth(ILogger<Auth> logger, IDatabaseService dbContext, IEmailCommun
 {
     [Function("Login")]
     public async Task<LoginResult> RunLogin([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req, [FromBody] Credentials creds,
-        [SqlInput(commandText: "GetLoginInfo", commandType: System.Data.CommandType.StoredProcedure, parameters: "@email={Username}",
+        [SqlInput(commandText: "GetLoginInfo", commandType: CommandType.StoredProcedure, parameters: "@email={Username}",
         connectionStringSetting: "SqlConnectionString")] IEnumerable<LoginInfo> loginInfos)
     {
         logger.LogInformation("[Login] function processed a request.");
@@ -123,7 +124,7 @@ public class Auth(ILogger<Auth> logger, IDatabaseService dbContext, IEmailCommun
 
     [Function("SignUp")]
     public async Task<SignUpResult> RunSignUp([HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestData req, [FromBody] SignUp signUp,
-        [SqlInput(commandText: "CheckExistingUser", commandType: System.Data.CommandType.StoredProcedure, parameters: "@email={Email}",
+        [SqlInput(commandText: "CheckExistingUser", commandType: CommandType.StoredProcedure, parameters: "@email={Email}",
         connectionStringSetting: "SqlConnectionString")] string scalarJson)
     {
         logger.LogInformation("[SignUp] function processed a request.");
@@ -209,7 +210,7 @@ public class Auth(ILogger<Auth> logger, IDatabaseService dbContext, IEmailCommun
                 emailService.SendAsync(Settings.EmailSenderAddress, user.Email, "Verify you email address for SnapApp", emailHtmlContent).Result)
             {
                 resp.Headers.Add("Content-Type", "application/json; charset=utf-8");
-                resp.StatusCode = HttpStatusCode.OK;
+                resp.StatusCode = HttpStatusCode.Created;
                 await resp.WriteStringAsync(JsonSerializer.Serialize(new
                 {
                     UserId = userId,
@@ -227,8 +228,8 @@ public class Auth(ILogger<Auth> logger, IDatabaseService dbContext, IEmailCommun
             }
 
             resp.Headers.Add("Content-Type", "text/plain; charset=utf-8");
-            resp.StatusCode = HttpStatusCode.BadRequest;
-            await resp.WriteStringAsync($"Unable to send verification email.");
+            resp.StatusCode = HttpStatusCode.InternalServerError;
+            await resp.WriteStringAsync("Unable to send verification email.");
 
             return new SignUpResult()
             {
@@ -248,8 +249,33 @@ public class Auth(ILogger<Auth> logger, IDatabaseService dbContext, IEmailCommun
         }
     }
 
+    [Function("AcceptInvite")]
+    public async Task<HttpResponseData> RunAcceptInvite([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "AcceptInvite/{code}")] HttpRequestData req,
+        [SqlInput(commandText: "AcceptInvitation", commandType: CommandType.StoredProcedure, parameters: "@code={code}", connectionStringSetting: "SqlConnectionString")] string scalarJson)
+    {
+        logger.LogInformation("[AcceptInvite] function processed a request.");
+
+        var scalarObj = JsonSerializer.Deserialize<object>(scalarJson);
+        bool codeExists = scalarObj is JsonElement jEle && jEle[0].GetProperty("CodeExists").GetInt32() != 0;
+        HttpResponseData resp = req.CreateResponse();
+        resp.Headers.Add("Content-Type", "text/plain; charset=utf-8");
+
+        if (codeExists)
+        {
+            resp.StatusCode = HttpStatusCode.OK;
+            await resp.WriteStringAsync($"Invitation accepted.");
+        }
+        else
+        {
+            resp.StatusCode = HttpStatusCode.Gone;
+            await resp.WriteStringAsync("Invitation already accepted.");
+        }
+
+        return resp;
+    }
+
     [Function("Verify")]
-    public async Task <UserResult> RunVerify([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "verify/{token}")] HttpRequestData req, string token)
+    public async Task<UserResult> RunVerify([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "Verify/{token}")] HttpRequestData req, string token)
     {
         logger.LogInformation("[Verify] function processed a request.");
 
@@ -275,7 +301,7 @@ public class Auth(ILogger<Auth> logger, IDatabaseService dbContext, IEmailCommun
             if (!userInfo.IsEmailVerified)
             {
                 resp.StatusCode = HttpStatusCode.OK;
-                await resp.WriteStringAsync($"Thank you for verifying your email.");
+                await resp.WriteStringAsync("Thank you for verifying your email.");
 
                 return new UserResult()
                 {
@@ -297,8 +323,8 @@ public class Auth(ILogger<Auth> logger, IDatabaseService dbContext, IEmailCommun
                 };
             }
 
-            resp.StatusCode = HttpStatusCode.OK;
-            await resp.WriteStringAsync($"Email already verified.");
+            resp.StatusCode = HttpStatusCode.Gone;
+            await resp.WriteStringAsync("Email already verified.");
 
             return new UserResult()
             {
@@ -358,7 +384,7 @@ public class Auth(ILogger<Auth> logger, IDatabaseService dbContext, IEmailCommun
                         catch
                         {
                             resp.Headers.Add("Content-Type", "text/plain; charset=utf-8");
-                            resp.StatusCode = HttpStatusCode.Unauthorized;
+                            resp.StatusCode = HttpStatusCode.BadRequest;
                             await resp.WriteStringAsync("Invalid token.");
 
                             return resp;
@@ -411,7 +437,7 @@ public class Auth(ILogger<Auth> logger, IDatabaseService dbContext, IEmailCommun
                             else
                             {
                                 resp.Headers.Add("Content-Type", "text/plain; charset=utf-8");
-                                resp.StatusCode = HttpStatusCode.Unauthorized;
+                                resp.StatusCode = isAuthExpired ? HttpStatusCode.Unauthorized : HttpStatusCode.BadRequest;
                                 await resp.WriteStringAsync(isAuthExpired ? "Authentication expired." : "Invalid token.");
 
                                 if (isAuthExpired)
